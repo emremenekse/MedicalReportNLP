@@ -1,10 +1,13 @@
 from flask import Flask, request, jsonify
 import spacy
 from transformers import pipeline
+from flair.data import Sentence
+from flair.models import SequenceTagger
 
 #python C:\Users\emree\OneDrive\Masaüstü\MedicalReport\MedicalReportPython\medicalReportPython.py
 nlp = spacy.load("en_core_web_sm")
 ner_pipeline = pipeline("ner", model="dbmdz/bert-large-cased-finetuned-conll03-english")
+flair_tagger = SequenceTagger.load("ner")
 
 app = Flask(__name__)
 
@@ -57,6 +60,28 @@ def predict_bert():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/predict/flair', methods=['POST'])
+def predict_flair():
+    data = request.json
+    if not data or 'text' not in data:
+        return jsonify({'error': 'Text field is required'}), 400
+
+    text = data['text']
+    try:
+        sentence = Sentence(text)
+        
+        flair_tagger.predict(sentence)
+
+        entities = []
+        for entity in sentence.get_spans('ner'):  
+            entities.append({
+                "text": entity.text,  
+                "entityType": entity.tag
+            })
+
+        return jsonify({'body': {'tokens': entities}})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == "__main__":
